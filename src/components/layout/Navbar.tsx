@@ -1,6 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   TestTube,
   FileText,
@@ -9,6 +11,9 @@ import {
   Eye,
   Play,
   LogOut,
+  Settings,
+  Moon,
+  Sun,
 } from "lucide-react";
 
 interface NavbarProps {
@@ -17,6 +22,8 @@ interface NavbarProps {
 
 export default function Navbar({ onLogout = () => {} }: NavbarProps) {
   const location = useLocation();
+  const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const navItems = [
     { path: "/", label: "Dashboard", icon: TestTube },
@@ -25,15 +32,16 @@ export default function Navbar({ onLogout = () => {} }: NavbarProps) {
     { path: "/collaboration", label: "Collaboration", icon: Users },
     { path: "/visual-comparison", label: "Visual Comparison", icon: Eye },
     { path: "/manual-tests", label: "Manual Tests", icon: Play },
+    { path: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (
-    <nav className="bg-white border-b border-gray-200 px-4 py-3">
+    <nav className="bg-background border-b border-border px-4 py-3">
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         <div className="flex items-center space-x-8">
           <div className="flex items-center space-x-2">
             <TestTube className="h-8 w-8 text-primary" />
-            <span className="text-xl font-bold text-gray-900">
+            <span className="text-xl font-bold text-foreground">
               Test Insights Hub
             </span>
           </div>
@@ -62,15 +70,47 @@ export default function Navbar({ onLogout = () => {} }: NavbarProps) {
           </div>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onLogout}
-          className="flex items-center space-x-2"
-        >
-          <LogOut className="h-4 w-4" />
-          <span>Logout</span>
-        </Button>
+        <div className="flex items-center space-x-2">
+          {/* Theme Toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleTheme}
+            className="flex items-center space-x-2"
+          >
+            {theme === "dark" ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
+            <span className="hidden md:inline">
+              {theme === "dark" ? "Light" : "Dark"}
+            </span>
+          </Button>
+
+          {/* User Info */}
+          {user && (
+            <div className="hidden md:flex items-center space-x-2 px-3 py-1 rounded-md bg-muted">
+              <div className="text-sm">
+                <p className="font-medium text-foreground">
+                  {user.firstName} {user.lastName}
+                </p>
+                <p className="text-xs text-muted-foreground">{user.role}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Logout Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onLogout}
+            className="flex items-center space-x-2"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Logout</span>
+          </Button>
+        </div>
       </div>
     </nav>
   );
