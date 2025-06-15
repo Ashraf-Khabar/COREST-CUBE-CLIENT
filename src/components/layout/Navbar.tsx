@@ -15,6 +15,7 @@ import {
   Moon,
   Sun,
   ChevronDown,
+  FolderOpen,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -23,6 +24,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface NavbarProps {
@@ -33,6 +41,14 @@ export default function Navbar({ onLogout = () => {} }: NavbarProps) {
   const location = useLocation();
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+
+  // Mock projects data - in real app this would come from context/API
+  const projects = [
+    { id: "1", name: "E-commerce Platform", status: "active" },
+    { id: "2", name: "Mobile App Backend", status: "active" },
+    { id: "3", name: "Analytics Dashboard", status: "archived" },
+  ];
+  const currentProject = projects[0];
 
   const navItems = [
     { path: "/", label: "Dashboard", icon: TestTube },
@@ -78,7 +94,33 @@ export default function Navbar({ onLogout = () => {} }: NavbarProps) {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-4">
+          {/* Project Selector */}
+          <div className="flex items-center space-x-2">
+            <FolderOpen className="h-4 w-4 text-muted-foreground" />
+            <Select defaultValue={currentProject.id}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    <div className="flex items-center space-x-2">
+                      <div
+                        className={`w-2 h-2 rounded-full ${
+                          project.status === "active"
+                            ? "bg-green-500"
+                            : "bg-gray-400"
+                        }`}
+                      />
+                      <span>{project.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Theme Toggle */}
           <Button
             variant="ghost"

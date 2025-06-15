@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   Play,
   Upload,
@@ -27,6 +29,10 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  FileText,
+  Terminal,
+  Pause,
+  Square,
 } from "lucide-react";
 
 interface TestFile {
@@ -51,7 +57,13 @@ interface TestExecution {
 }
 
 export default function ManualTestExecution() {
+  const [selectedLanguage, setSelectedLanguage] = useState("");
   const [selectedFramework, setSelectedFramework] = useState("");
+  const [testDirectory, setTestDirectory] = useState("");
+  const [outputDirectory, setOutputDirectory] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
+  const [currentExecution, setCurrentExecution] =
+    useState<TestExecution | null>(null);
   const [testFiles, setTestFiles] = useState<TestFile[]>([
     {
       id: "1",
@@ -108,12 +120,42 @@ export default function ManualTestExecution() {
     },
   ]);
 
+  const testLanguages = [
+    {
+      value: "javascript",
+      label: "JavaScript (Jest/Cypress/Playwright)",
+      extensions: [".js", ".ts", ".spec.js", ".test.js"],
+    },
+    {
+      value: "python",
+      label: "Python (Pytest/Selenium)",
+      extensions: [".py", "test_*.py", "*_test.py"],
+    },
+    {
+      value: "java",
+      label: "Java (JUnit/TestNG)",
+      extensions: [".java", "Test.java", "Tests.java"],
+    },
+    {
+      value: "csharp",
+      label: "C# (NUnit/MSTest)",
+      extensions: [".cs", "Test.cs", "Tests.cs"],
+    },
+    {
+      value: "robot",
+      label: "Robot Framework",
+      extensions: [".robot", ".txt"],
+    },
+  ];
+
   const frameworks = [
     { value: "cypress", label: "Cypress" },
     { value: "selenium", label: "Selenium" },
     { value: "robot", label: "Robot Framework" },
     { value: "playwright", label: "Playwright" },
     { value: "jest", label: "Jest" },
+    { value: "pytest", label: "Pytest" },
+    { value: "junit", label: "JUnit" },
   ];
 
   const filteredTestFiles = selectedFramework
@@ -134,6 +176,20 @@ export default function ManualTestExecution() {
     );
   };
 
+  const handleBrowseDirectory = (type: "test" | "output") => {
+    // In a real application, this would open a file dialog
+    // For demo purposes, we'll simulate directory selection
+    const mockPath =
+      type === "test"
+        ? "/Users/username/my-project/tests"
+        : "/Users/username/my-project/test-results";
+    if (type === "test") {
+      setTestDirectory(mockPath);
+    } else {
+      setOutputDirectory(mockPath);
+    }
+  };
+
   const handleRunTests = () => {
     const selectedFiles = testFiles.filter((file) => file.selected);
     if (selectedFiles.length === 0) {
@@ -141,30 +197,68 @@ export default function ManualTestExecution() {
       return;
     }
 
+    if (!testDirectory || !outputDirectory) {
+      alert("Please select both test directory and output directory.");
+      return;
+    }
+
+    setIsRunning(true);
     const newExecution: TestExecution = {
       id: Date.now().toString(),
-      name: `${selectedFramework} Tests - ${selectedFiles.length} files`,
+      name: `${selectedLanguage} Tests - ${selectedFiles.length} files`,
       status: "running",
       startTime: new Date().toLocaleString(),
     };
 
+    setCurrentExecution(newExecution);
     setExecutions((prev) => [newExecution, ...prev]);
 
-    // Simulate test completion after 3 seconds
-    setTimeout(() => {
+    // Simulate test execution with progress updates
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += Math.random() * 20;
+      if (progress >= 100) {
+        progress = 100;
+        clearInterval(interval);
+
+        // Complete the execution
+        const completedExecution = {
+          ...newExecution,
+          status: "completed" as const,
+          duration: "2m 15s",
+          results: {
+            passed: Math.floor(Math.random() * 8) + 2,
+            failed: Math.floor(Math.random() * 3),
+            total: selectedFiles.length,
+          },
+        };
+
+        setCurrentExecution(completedExecution);
+        setExecutions((prev) =>
+          prev.map((exec) =>
+            exec.id === newExecution.id ? completedExecution : exec,
+          ),
+        );
+        setIsRunning(false);
+      }
+    }, 500);
+  };
+
+  const handleStopTests = () => {
+    setIsRunning(false);
+    if (currentExecution) {
+      const stoppedExecution = {
+        ...currentExecution,
+        status: "failed" as const,
+        duration: "Stopped",
+      };
+      setCurrentExecution(stoppedExecution);
       setExecutions((prev) =>
         prev.map((exec) =>
-          exec.id === newExecution.id
-            ? {
-                ...exec,
-                status: "completed" as const,
-                duration: "1m 23s",
-                results: { passed: 5, failed: 0, total: 5 },
-              }
-            : exec,
+          exec.id === currentExecution.id ? stoppedExecution : exec,
         ),
       );
-    }, 3000);
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -207,21 +301,43 @@ export default function ManualTestExecution() {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <Settings className="h-5 w-5" />
-                    <span>Test Framework</span>
+                    <span>Test Configuration</span>
                   </CardTitle>
                   <CardDescription>
-                    Select the testing framework you want to use
+                    Configure your test language, framework, and directories
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="framework">Framework</Label>
+                    <Label htmlFor="language">Test Language</Label>
+                    <Select
+                      value={selectedLanguage}
+                      onValueChange={setSelectedLanguage}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select test language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {testLanguages.map((language) => (
+                          <SelectItem
+                            key={language.value}
+                            value={language.value}
+                          >
+                            {language.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="framework">Framework (Optional)</Label>
                     <Select
                       value={selectedFramework}
                       onValueChange={setSelectedFramework}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a testing framework" />
+                        <SelectValue placeholder="Select testing framework" />
                       </SelectTrigger>
                       <SelectContent>
                         {frameworks.map((framework) => (
@@ -237,15 +353,42 @@ export default function ManualTestExecution() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="outputPath">Output Path</Label>
+                    <Label htmlFor="testDirectory">Test Directory</Label>
                     <div className="flex space-x-2">
                       <Input
-                        id="outputPath"
-                        value={outputPath}
-                        onChange={(e) => setOutputPath(e.target.value)}
-                        placeholder="/path/to/test-results"
+                        id="testDirectory"
+                        value={testDirectory}
+                        onChange={(e) => setTestDirectory(e.target.value)}
+                        placeholder="Select folder containing your tests"
+                        readOnly
                       />
-                      <Button variant="outline" size="icon">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleBrowseDirectory("test")}
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="outputDirectory">
+                      Results Output Directory
+                    </Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        id="outputDirectory"
+                        value={outputDirectory}
+                        onChange={(e) => setOutputDirectory(e.target.value)}
+                        placeholder="Select folder to save test results"
+                        readOnly
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleBrowseDirectory("output")}
+                      >
                         <FolderOpen className="h-4 w-4" />
                       </Button>
                     </div>
@@ -259,7 +402,7 @@ export default function ManualTestExecution() {
                       id="customCommand"
                       value={customCommand}
                       onChange={(e) => setCustomCommand(e.target.value)}
-                      placeholder="npx cypress run --spec 'cypress/e2e/**/*.cy.js'"
+                      placeholder="Custom test execution command..."
                       rows={3}
                     />
                   </div>
@@ -345,45 +488,159 @@ export default function ManualTestExecution() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="bg-muted p-4 rounded-lg">
                   <h3 className="font-medium mb-2">Execution Summary</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-600">Framework:</span>
+                      <span className="text-muted-foreground">Language:</span>
                       <p className="font-medium">
-                        {selectedFramework || "Not selected"}
+                        {selectedLanguage || "Not selected"}
                       </p>
                     </div>
                     <div>
-                      <span className="text-gray-600">Selected Files:</span>
+                      <span className="text-muted-foreground">
+                        Selected Files:
+                      </span>
                       <p className="font-medium">
                         {testFiles.filter((f) => f.selected).length}
                       </p>
                     </div>
                     <div>
-                      <span className="text-gray-600">Output Path:</span>
-                      <p className="font-medium">{outputPath}</p>
+                      <span className="text-muted-foreground">
+                        Test Directory:
+                      </span>
+                      <p className="font-medium truncate" title={testDirectory}>
+                        {testDirectory || "Not selected"}
+                      </p>
                     </div>
                     <div>
-                      <span className="text-gray-600">Status:</span>
-                      <p className="font-medium text-green-600">Ready</p>
+                      <span className="text-muted-foreground">Status:</span>
+                      <p
+                        className={`font-medium ${
+                          isRunning
+                            ? "text-blue-600"
+                            : testDirectory &&
+                                outputDirectory &&
+                                selectedLanguage
+                              ? "text-green-600"
+                              : "text-yellow-600"
+                        }`}
+                      >
+                        {isRunning
+                          ? "Running"
+                          : testDirectory && outputDirectory && selectedLanguage
+                            ? "Ready"
+                            : "Configuration needed"}
+                      </p>
                     </div>
                   </div>
                 </div>
 
+                {/* Live Execution Status */}
+                {isRunning && currentExecution && (
+                  <Card className="border-blue-200 bg-blue-50">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <Terminal className="h-5 w-5 text-blue-600" />
+                          <span className="font-medium">Running Tests...</span>
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className="bg-blue-100 text-blue-800"
+                        >
+                          In Progress
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Executing: {currentExecution.name}</span>
+                          <span>{currentExecution.startTime}</span>
+                        </div>
+                        <Progress value={Math.random() * 100} className="h-2" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Test Results */}
+                {currentExecution &&
+                  currentExecution.status === "completed" &&
+                  currentExecution.results && (
+                    <Card className="border-green-200 bg-green-50">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center space-x-2">
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <span className="font-medium">Tests Completed</span>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-800"
+                          >
+                            Finished
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div className="p-3 bg-white rounded-lg">
+                            <div className="text-2xl font-bold text-green-600">
+                              {currentExecution.results.passed}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Passed
+                            </div>
+                          </div>
+                          <div className="p-3 bg-white rounded-lg">
+                            <div className="text-2xl font-bold text-red-600">
+                              {currentExecution.results.failed}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Failed
+                            </div>
+                          </div>
+                          <div className="p-3 bg-white rounded-lg">
+                            <div className="text-2xl font-bold">
+                              {currentExecution.results.total}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Total
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                 <div className="flex space-x-4">
-                  <Button
-                    onClick={handleRunTests}
-                    disabled={
-                      !selectedFramework ||
-                      testFiles.filter((f) => f.selected).length === 0
-                    }
-                    className="flex items-center space-x-2"
-                  >
-                    <Play className="h-4 w-4" />
-                    <span>Run Tests</span>
-                  </Button>
+                  {!isRunning ? (
+                    <Button
+                      onClick={handleRunTests}
+                      disabled={
+                        !selectedLanguage ||
+                        !testDirectory ||
+                        !outputDirectory ||
+                        testFiles.filter((f) => f.selected).length === 0
+                      }
+                      className="flex items-center space-x-2"
+                    >
+                      <Play className="h-4 w-4" />
+                      <span>Run Tests</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleStopTests}
+                      variant="destructive"
+                      className="flex items-center space-x-2"
+                    >
+                      <Square className="h-4 w-4" />
+                      <span>Stop Tests</span>
+                    </Button>
+                  )}
                   <Button variant="outline">Save Configuration</Button>
+                  <Button variant="outline">
+                    <FileText className="h-4 w-4 mr-2" />
+                    View Logs
+                  </Button>
                 </div>
               </CardContent>
             </Card>
