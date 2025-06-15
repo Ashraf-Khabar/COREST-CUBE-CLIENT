@@ -169,11 +169,13 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
   const lowRiskTests = flakyTests.filter((t) => t.category === "low").length;
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm w-full">
+    <div className="bg-background p-6 rounded-lg shadow-sm w-full">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold mb-2">Flaky Test Analysis</h1>
-          <p className="text-gray-600">
+          <h1 className="text-2xl font-bold mb-2 text-foreground">
+            Flaky Test Analysis
+          </h1>
+          <p className="text-muted-foreground">
             Identify and resolve unstable tests with AI-powered insights
           </p>
         </div>
@@ -191,7 +193,9 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">High Risk</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  High Risk
+                </p>
                 <p className="text-2xl font-bold text-red-600">
                   {highRiskTests}
                 </p>
@@ -205,7 +209,9 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Medium Risk</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Medium Risk
+                </p>
                 <p className="text-2xl font-bold text-yellow-600">
                   {mediumRiskTests}
                 </p>
@@ -219,7 +225,9 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Low Risk</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Low Risk
+                </p>
                 <p className="text-2xl font-bold text-green-600">
                   {lowRiskTests}
                 </p>
@@ -233,7 +241,9 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Total Tests</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Total Tests
+                </p>
                 <p className="text-2xl font-bold">{flakyTests.length}</p>
               </div>
               <Clock className="h-8 w-8 text-blue-500" />
@@ -324,7 +334,7 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
                     <TableCell>
                       <Badge variant="outline">{test.environment}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-gray-500">
+                    <TableCell className="text-sm text-muted-foreground">
                       {test.lastFailure}
                     </TableCell>
                     <TableCell>
@@ -365,7 +375,7 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
                   {test.suggestedFixes.map((fix, index) => (
                     <div key={index} className="flex items-start gap-2 text-sm">
                       <div className="w-2 h-2 rounded-full bg-blue-500 mt-2 flex-shrink-0"></div>
-                      <span className="text-gray-700">{fix}</span>
+                      <span className="text-foreground">{fix}</span>
                     </div>
                   ))}
                 </div>
