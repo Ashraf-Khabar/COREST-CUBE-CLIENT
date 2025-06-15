@@ -9,6 +9,13 @@ interface User {
   avatar?: string;
   role: "admin" | "user" | "viewer";
   organization?: string;
+  permissions: {
+    canWrite: boolean;
+    canDelete: boolean;
+    canManageUsers: boolean;
+    canManageProjects: boolean;
+    canExportData: boolean;
+  };
   preferences?: {
     theme: "light" | "dark";
     notifications: boolean;
@@ -29,6 +36,9 @@ interface AuthContextType {
   // Backend integration helpers
   getAuthToken: () => string | null;
   refreshToken: () => Promise<void>;
+  // Permission helpers
+  hasPermission: (permission: keyof User["permissions"]) => boolean;
+  isAdmin: () => boolean;
 }
 
 interface SignupData {
@@ -95,6 +105,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         lastName: "Doe",
         role: "admin",
         organization: "Test Organization",
+        permissions: {
+          canWrite: true,
+          canDelete: true,
+          canManageUsers: true,
+          canManageProjects: true,
+          canExportData: true,
+        },
         preferences: {
           theme: "light",
           notifications: true,
@@ -138,6 +155,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         lastName: data.lastName,
         role: "user",
         organization: data.organization,
+        permissions: {
+          canWrite: true,
+          canDelete: false,
+          canManageUsers: false,
+          canManageProjects: false,
+          canExportData: true,
+        },
         preferences: {
           theme: "light",
           notifications: true,
@@ -225,6 +249,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const hasPermission = (permission: keyof User["permissions"]) => {
+    return user?.permissions[permission] || false;
+  };
+
+  const isAdmin = () => {
+    return user?.role === "admin";
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -237,6 +269,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateProfile,
         getAuthToken,
         refreshToken,
+        hasPermission,
+        isAdmin,
       }}
     >
       {children}

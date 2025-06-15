@@ -28,7 +28,12 @@ import {
   Filter,
   Calendar,
   Eye,
+  FolderOpen,
+  Trash2,
+  Upload,
+  Lock,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Artifact {
   id: string;
@@ -39,6 +44,10 @@ interface Artifact {
   size: string;
   timestamp: string;
   url: string;
+  projectId: string;
+  projectName: string;
+  uploadedBy: string;
+  isPublic: boolean;
 }
 
 interface ArtifactsRepositoryProps {
@@ -56,6 +65,10 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
       size: "2.3 MB",
       timestamp: "2023-06-15 14:32:45",
       url: "https://images.unsplash.com/photo-1573867639040-6dd25fa5f597?w=600&q=80",
+      projectId: "1",
+      projectName: "E-commerce Platform",
+      uploadedBy: "Alice Johnson",
+      isPublic: true,
     },
     {
       id: "2",
@@ -66,6 +79,10 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
       size: "45 KB",
       timestamp: "2023-06-15 14:32:45",
       url: "#",
+      projectId: "1",
+      projectName: "E-commerce Platform",
+      uploadedBy: "Bob Smith",
+      isPublic: false,
     },
     {
       id: "3",
@@ -76,6 +93,10 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
       size: "125 MB",
       timestamp: "2023-06-15 14:30:00",
       url: "#",
+      projectId: "2",
+      projectName: "Mobile App Backend",
+      uploadedBy: "Carol Davis",
+      isPublic: true,
     },
     {
       id: "4",
@@ -86,6 +107,10 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
       size: "1.8 MB",
       timestamp: "2023-06-15 13:45:22",
       url: "#",
+      projectId: "1",
+      projectName: "E-commerce Platform",
+      uploadedBy: "David Wilson",
+      isPublic: true,
     },
     {
       id: "5",
@@ -96,12 +121,19 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
       size: "3.1 MB",
       timestamp: "2023-06-15 12:18:03",
       url: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80",
+      projectId: "3",
+      projectName: "Analytics Dashboard",
+      uploadedBy: "Eve Martinez",
+      isPublic: false,
     },
   ],
 }) => {
+  const { hasPermission, isAdmin } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterTestRun, setFilterTestRun] = useState("all");
+  const [filterProject, setFilterProject] = useState("all");
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -143,10 +175,17 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
     const matchesType = filterType === "all" || artifact.type === filterType;
     const matchesTestRun =
       filterTestRun === "all" || artifact.testRun === filterTestRun;
-    return matchesSearch && matchesType && matchesTestRun;
+    const matchesProject =
+      filterProject === "all" || artifact.projectId === filterProject;
+    return matchesSearch && matchesType && matchesTestRun && matchesProject;
   });
 
   const uniqueTestRuns = [...new Set(artifacts.map((a) => a.testRun))];
+  const uniqueProjects = [
+    ...new Set(
+      artifacts.map((a) => ({ id: a.projectId, name: a.projectName })),
+    ),
+  ];
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm w-full">
@@ -158,6 +197,16 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
           </p>
         </div>
         <div className="flex gap-2 mt-4 md:mt-0">
+          {hasPermission("canWrite") && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUploadDialog(true)}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Artifact
+            </Button>
+          )}
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Bulk Download
@@ -180,6 +229,22 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
                 />
               </div>
             </div>
+            <Select value={filterProject} onValueChange={setFilterProject}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                {uniqueProjects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="h-3 w-3" />
+                      {project.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={filterType} onValueChange={setFilterType}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Filter by type" />
@@ -224,9 +289,11 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Project</TableHead>
                   <TableHead>Test Run</TableHead>
                   <TableHead>Test Case</TableHead>
                   <TableHead>Size</TableHead>
+                  <TableHead>Uploaded By</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -237,10 +304,19 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         {getTypeIcon(artifact.type)}
-                        {artifact.name}
+                        <span>{artifact.name}</span>
+                        {!artifact.isPublic && (
+                          <Lock className="h-3 w-3 text-gray-400" />
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>{getTypeBadge(artifact.type)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <FolderOpen className="h-3 w-3 text-gray-500" />
+                        <span className="text-sm">{artifact.projectName}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{artifact.testRun}</Badge>
                     </TableCell>
@@ -251,6 +327,9 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
                       {artifact.testCase}
                     </TableCell>
                     <TableCell>{artifact.size}</TableCell>
+                    <TableCell className="text-sm text-gray-600">
+                      {artifact.uploadedBy}
+                    </TableCell>
                     <TableCell>{artifact.timestamp}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
@@ -260,6 +339,15 @@ const ArtifactsRepository: React.FC<ArtifactsRepositoryProps> = ({
                         <Button variant="ghost" size="icon">
                           <Download className="h-4 w-4" />
                         </Button>
+                        {(hasPermission("canDelete") || isAdmin()) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

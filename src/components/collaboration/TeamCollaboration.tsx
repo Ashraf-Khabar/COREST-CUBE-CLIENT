@@ -24,7 +24,12 @@ import {
   Send,
   Pin,
   MoreHorizontal,
+  FolderOpen,
+  UserPlus,
+  Settings,
+  Shield,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface TeamMember {
   id: string;
@@ -33,6 +38,12 @@ interface TeamMember {
   avatar: string;
   status: "online" | "offline" | "away";
   lastActive: string;
+  projectAccess: string[];
+  permissions: {
+    canWrite: boolean;
+    canDelete: boolean;
+    canManageUsers: boolean;
+  };
 }
 
 interface Comment {
@@ -42,7 +53,10 @@ interface Comment {
   timestamp: string;
   mentions: string[];
   testRunId?: string;
+  projectId: string;
+  projectName: string;
   isPinned: boolean;
+  isPrivate: boolean;
 }
 
 interface SharedReport {
@@ -52,6 +66,9 @@ interface SharedReport {
   sharedWith: TeamMember[];
   createdAt: string;
   type: "summary" | "detailed" | "trend";
+  projectId: string;
+  projectName: string;
+  accessLevel: "public" | "team" | "private";
 }
 
 interface TeamCollaborationProps {
@@ -69,6 +86,12 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
       avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
       status: "online",
       lastActive: "now",
+      projectAccess: ["1", "2", "3"],
+      permissions: {
+        canWrite: true,
+        canDelete: true,
+        canManageUsers: true,
+      },
     },
     {
       id: "2",
@@ -77,6 +100,12 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
       avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bob",
       status: "away",
       lastActive: "5 minutes ago",
+      projectAccess: ["1", "2"],
+      permissions: {
+        canWrite: true,
+        canDelete: false,
+        canManageUsers: false,
+      },
     },
     {
       id: "3",
@@ -85,6 +114,12 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
       avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carol",
       status: "online",
       lastActive: "now",
+      projectAccess: ["2", "3"],
+      permissions: {
+        canWrite: true,
+        canDelete: false,
+        canManageUsers: false,
+      },
     },
     {
       id: "4",
@@ -93,6 +128,12 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
       avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
       status: "offline",
       lastActive: "2 hours ago",
+      projectAccess: ["1"],
+      permissions: {
+        canWrite: true,
+        canDelete: false,
+        canManageUsers: false,
+      },
     },
   ],
   comments = [
@@ -105,13 +146,22 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
         avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alice",
         status: "online",
         lastActive: "now",
+        projectAccess: ["1", "2", "3"],
+        permissions: {
+          canWrite: true,
+          canDelete: true,
+          canManageUsers: true,
+        },
       },
       content:
         "The login test failure seems to be related to the new authentication changes. @bob can you take a look at the timeout settings?",
       timestamp: "2023-06-15 14:32:45",
       mentions: ["bob"],
       testRunId: "TR-12345",
+      projectId: "1",
+      projectName: "E-commerce Platform",
       isPinned: true,
+      isPrivate: false,
     },
     {
       id: "2",
@@ -206,8 +256,11 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
     },
   ],
 }) => {
+  const { hasPermission, isAdmin } = useAuth();
   const [newComment, setNewComment] = useState("");
   const [selectedTestRun, setSelectedTestRun] = useState("all");
+  const [filterProject, setFilterProject] = useState("all");
+  const [showUserManagement, setShowUserManagement] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -252,6 +305,16 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
           </p>
         </div>
         <div className="flex gap-2 mt-4 md:mt-0">
+          {isAdmin() && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUserManagement(true)}
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Manage Users
+            </Button>
+          )}
           <Button variant="outline" size="sm">
             <Bell className="h-4 w-4 mr-2" />
             Notifications
@@ -268,6 +331,9 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
           <TabsTrigger value="discussions">Discussions</TabsTrigger>
           <TabsTrigger value="team">Team Members</TabsTrigger>
           <TabsTrigger value="reports">Shared Reports</TabsTrigger>
+          {isAdmin() && (
+            <TabsTrigger value="permissions">Permissions</TabsTrigger>
+          )}
         </TabsList>
 
         {/* Discussions Tab */}
@@ -282,20 +348,51 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <Select
-                  value={selectedTestRun}
-                  onValueChange={setSelectedTestRun}
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select test run" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">General Discussion</SelectItem>
-                    <SelectItem value="TR-12345">TR-12345</SelectItem>
-                    <SelectItem value="TR-12344">TR-12344</SelectItem>
-                    <SelectItem value="TR-12343">TR-12343</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-4">
+                  <Select
+                    value={filterProject}
+                    onValueChange={setFilterProject}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      <SelectItem value="1">
+                        <div className="flex items-center gap-2">
+                          <FolderOpen className="h-3 w-3" />
+                          E-commerce Platform
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="2">
+                        <div className="flex items-center gap-2">
+                          <FolderOpen className="h-3 w-3" />
+                          Mobile App Backend
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="3">
+                        <div className="flex items-center gap-2">
+                          <FolderOpen className="h-3 w-3" />
+                          Analytics Dashboard
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={selectedTestRun}
+                    onValueChange={setSelectedTestRun}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select test run" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">General Discussion</SelectItem>
+                      <SelectItem value="TR-12345">TR-12345</SelectItem>
+                      <SelectItem value="TR-12344">TR-12344</SelectItem>
+                      <SelectItem value="TR-12343">TR-12343</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Textarea
                   placeholder="Share your thoughts, mention team members with @username..."
                   value={newComment}
@@ -307,7 +404,10 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
                     <AtSign className="h-4 w-4" />
                     <span>Use @username to mention team members</span>
                   </div>
-                  <Button onClick={handleSendComment}>
+                  <Button
+                    onClick={handleSendComment}
+                    disabled={!hasPermission("canWrite")}
+                  >
                     <Send className="h-4 w-4 mr-2" />
                     Send Comment
                   </Button>
@@ -350,6 +450,19 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
                               </Badge>
                             )}
                           </div>
+                          <div className="flex items-center gap-1 text-sm text-gray-500">
+                            <FolderOpen className="h-2 w-2 mr-1" />
+                            {comment.projectName}
+                            {comment.isPrivate && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs text-orange-600"
+                              >
+                                <Shield className="h-2 w-2 mr-1" />
+                                Private
+                              </Badge>
+                            )}
+                          </div>
                           <span className="text-sm text-gray-500">
                             {comment.timestamp}
                           </span>
@@ -359,9 +472,11 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
                         {comment.isPinned && (
                           <Pin className="h-4 w-4 text-blue-500" />
                         )}
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
+                        {(hasPermission("canDelete") || isAdmin()) && (
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <p className="text-gray-700 ml-11">{comment.content}</p>
@@ -413,23 +528,35 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
                         <p className="text-sm text-gray-500">{member.role}</p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-2 h-2 rounded-full ${getStatusColor(member.status)}`}
-                        ></div>
-                        <span className="text-sm capitalize">
-                          {member.status}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`w-2 h-2 rounded-full ${getStatusColor(member.status)}`}
+                          ></div>
+                          <span className="text-sm capitalize">
+                            {member.status}
+                          </span>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {member.lastActive}
                         </span>
                       </div>
-                      <span className="text-xs text-gray-500">
-                        {member.lastActive}
-                      </span>
+                      <div className="text-xs text-gray-500">
+                        Access: {member.projectAccess.length} project(s)
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="sm" className="flex-1">
+                          <MessageSquare className="h-4 w-4 mr-1" />
+                          Message
+                        </Button>
+                        {isAdmin() && (
+                          <Button variant="outline" size="sm">
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full mt-3">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Message
-                    </Button>
                   </div>
                 ))}
               </div>
@@ -510,6 +637,83 @@ const TeamCollaboration: React.FC<TeamCollaborationProps> = ({
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Permissions Tab */}
+        {isAdmin() && (
+          <TabsContent value="permissions">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  User Permissions Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {teamMembers.map((member) => (
+                    <div key={member.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={member.avatar} />
+                            <AvatarFallback>
+                              {member.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-medium">{member.name}</h3>
+                            <p className="text-sm text-gray-500">
+                              {member.role}
+                            </p>
+                          </div>
+                        </div>
+                        <Button variant="outline" size="sm">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Edit Permissions
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={member.permissions.canWrite}
+                            readOnly
+                            className="rounded"
+                          />
+                          <span className="text-sm">Can Write</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={member.permissions.canDelete}
+                            readOnly
+                            className="rounded"
+                          />
+                          <span className="text-sm">Can Delete</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={member.permissions.canManageUsers}
+                            readOnly
+                            className="rounded"
+                          />
+                          <span className="text-sm">Manage Users</span>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Projects: {member.projectAccess.length}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

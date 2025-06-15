@@ -29,7 +29,11 @@ import {
   CheckCircle,
   XCircle,
   Maximize2,
+  FolderOpen,
+  Save,
+  Settings,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface TestRun {
   id: string;
@@ -37,6 +41,9 @@ interface TestRun {
   timestamp: string;
   status: "passed" | "failed" | "partial";
   environment: string;
+  projectId: string;
+  projectName: string;
+  author: string;
 }
 
 interface ScreenshotComparison {
@@ -48,6 +55,10 @@ interface ScreenshotComparison {
   similarity: number;
   status: "match" | "mismatch" | "new";
   threshold: number;
+  projectId: string;
+  projectName: string;
+  approved: boolean;
+  approvedBy?: string;
 }
 
 interface VisualComparisonProps {
@@ -63,6 +74,9 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
       timestamp: "2023-06-15 14:30:00",
       status: "partial",
       environment: "Chrome / Windows",
+      projectId: "1",
+      projectName: "E-commerce Platform",
+      author: "Alice Johnson",
     },
     {
       id: "TR-12344",
@@ -70,6 +84,9 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
       timestamp: "2023-06-14 16:45:00",
       status: "passed",
       environment: "Chrome / Windows",
+      projectId: "1",
+      projectName: "E-commerce Platform",
+      author: "Bob Smith",
     },
     {
       id: "TR-12343",
@@ -77,6 +94,9 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
       timestamp: "2023-06-13 15:20:00",
       status: "failed",
       environment: "Chrome / Windows",
+      projectId: "2",
+      projectName: "Mobile App Backend",
+      author: "Carol Davis",
     },
   ],
   comparisons = [
@@ -92,6 +112,10 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
       similarity: 98.5,
       status: "match",
       threshold: 95,
+      projectId: "1",
+      projectName: "E-commerce Platform",
+      approved: true,
+      approvedBy: "Alice Johnson",
     },
     {
       id: "2",
@@ -105,6 +129,9 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
       similarity: 87.2,
       status: "mismatch",
       threshold: 95,
+      projectId: "1",
+      projectName: "E-commerce Platform",
+      approved: false,
     },
     {
       id: "3",
@@ -118,6 +145,9 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
       similarity: 92.8,
       status: "mismatch",
       threshold: 95,
+      projectId: "2",
+      projectName: "Mobile App Backend",
+      approved: false,
     },
     {
       id: "4",
@@ -131,6 +161,10 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
       similarity: 99.1,
       status: "match",
       threshold: 95,
+      projectId: "3",
+      projectName: "Analytics Dashboard",
+      approved: true,
+      approvedBy: "Bob Smith",
     },
   ],
 }) => {
@@ -142,6 +176,7 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
   const [viewMode, setViewMode] = useState<"side-by-side" | "overlay" | "diff">(
     "side-by-side",
   );
+  const [filterProject, setFilterProject] = useState("all");
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -175,11 +210,23 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
     return "text-red-600";
   };
 
-  const matchCount = comparisons.filter((c) => c.status === "match").length;
-  const mismatchCount = comparisons.filter(
+  const filteredComparisons = comparisons.filter((comparison) => {
+    return filterProject === "all" || comparison.projectId === filterProject;
+  });
+
+  const uniqueProjects = [
+    ...new Set(
+      comparisons.map((c) => ({ id: c.projectId, name: c.projectName })),
+    ),
+  ];
+
+  const matchCount = filteredComparisons.filter(
+    (c) => c.status === "match",
+  ).length;
+  const mismatchCount = filteredComparisons.filter(
     (c) => c.status === "mismatch",
   ).length;
-  const newCount = comparisons.filter((c) => c.status === "new").length;
+  const newCount = filteredComparisons.filter((c) => c.status === "new").length;
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm w-full">
@@ -192,6 +239,12 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
           </p>
         </div>
         <div className="flex gap-2 mt-4 md:mt-0">
+          {isAdmin() && (
+            <Button variant="outline" size="sm">
+              <Settings className="h-4 w-4 mr-2" />
+              Manage Baselines
+            </Button>
+          )}
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />
             Export Report
@@ -212,7 +265,28 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">
+                Filter by Project
+              </label>
+              <Select value={filterProject} onValueChange={setFilterProject}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Projects</SelectItem>
+                  {uniqueProjects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      <div className="flex items-center gap-2">
+                        <FolderOpen className="h-3 w-3" />
+                        {project.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <label className="text-sm font-medium mb-2 block">
                 Baseline Run
@@ -227,7 +301,12 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
                 <SelectContent>
                   {testRuns.map((run) => (
                     <SelectItem key={run.id} value={run.id}>
-                      {run.name} - {run.timestamp}
+                      <div className="flex flex-col">
+                        <span>{run.name}</span>
+                        <span className="text-xs text-gray-500">
+                          {run.projectName} - {run.timestamp}
+                        </span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -247,7 +326,12 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
                 <SelectContent>
                   {testRuns.map((run) => (
                     <SelectItem key={run.id} value={run.id}>
-                      {run.name} - {run.timestamp}
+                      <div className="flex flex-col">
+                        <span>{run.name}</span>
+                        <span className="text-xs text-gray-500">
+                          {run.projectName} - {run.timestamp}
+                        </span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -306,7 +390,9 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Total</p>
-                <p className="text-2xl font-bold">{comparisons.length}</p>
+                <p className="text-2xl font-bold">
+                  {filteredComparisons.length}
+                </p>
               </div>
               <Image className="h-8 w-8 text-gray-500" />
             </div>
@@ -332,17 +418,27 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Test Case</TableHead>
+                      <TableHead>Project</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Similarity</TableHead>
                       <TableHead>Threshold</TableHead>
+                      <TableHead>Approval</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {comparisons.map((comparison) => (
+                    {filteredComparisons.map((comparison) => (
                       <TableRow key={comparison.id}>
                         <TableCell className="font-medium">
                           {comparison.testCase}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <FolderOpen className="h-3 w-3 text-gray-500" />
+                            <span className="text-sm">
+                              {comparison.projectName}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -370,6 +466,30 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
                         </TableCell>
                         <TableCell>{comparison.threshold}%</TableCell>
                         <TableCell>
+                          <div className="flex items-center gap-2">
+                            {comparison.approved ? (
+                              <div className="flex items-center gap-1">
+                                <CheckCircle className="h-3 w-3 text-green-500" />
+                                <span className="text-xs text-green-600">
+                                  Approved
+                                </span>
+                                {comparison.approvedBy && (
+                                  <span className="text-xs text-gray-500">
+                                    by {comparison.approvedBy}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <XCircle className="h-3 w-3 text-gray-400" />
+                                <span className="text-xs text-gray-500">
+                                  Pending
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
                           <div className="flex space-x-2">
                             <Button
                               variant="ghost"
@@ -383,6 +503,16 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
                             <Button variant="ghost" size="icon">
                               <Download className="h-4 w-4" />
                             </Button>
+                            {hasPermission("canWrite") &&
+                              !comparison.approved && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-green-600 hover:text-green-700"
+                                >
+                                  <Save className="h-4 w-4" />
+                                </Button>
+                              )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -424,7 +554,7 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
               {selectedComparison ? (
                 <div className="space-y-6">
                   {(() => {
-                    const comparison = comparisons.find(
+                    const comparison = filteredComparisons.find(
                       (c) => c.id === selectedComparison,
                     );
                     if (!comparison) return null;
@@ -437,6 +567,12 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
                               {comparison.testCase}
                             </h3>
                             <div className="flex items-center gap-4 mt-1">
+                              <div className="flex items-center gap-2">
+                                <FolderOpen className="h-3 w-3 text-gray-500" />
+                                <span className="text-sm text-gray-600">
+                                  {comparison.projectName}
+                                </span>
+                              </div>
                               <div className="flex items-center gap-2">
                                 {getStatusIcon(comparison.status)}
                                 <Badge
@@ -451,8 +587,21 @@ const VisualComparison: React.FC<VisualComparisonProps> = ({
                               >
                                 {comparison.similarity.toFixed(1)}% similarity
                               </span>
+                              {comparison.approved && (
+                                <Badge className="bg-green-100 text-green-800">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Approved
+                                </Badge>
+                              )}
                             </div>
                           </div>
+                          {hasPermission("canWrite") &&
+                            !comparison.approved && (
+                              <Button variant="outline" size="sm">
+                                <Save className="h-4 w-4 mr-2" />
+                                Approve Changes
+                              </Button>
+                            )}
                         </div>
 
                         {viewMode === "side-by-side" && (

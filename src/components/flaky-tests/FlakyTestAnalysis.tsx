@@ -26,7 +26,12 @@ import {
   Target,
   Lightbulb,
   ExternalLink,
+  FolderOpen,
+  CheckCircle,
+  XCircle,
+  Settings,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface FlakyTest {
   id: string;
@@ -38,6 +43,11 @@ interface FlakyTest {
   suggestedFixes: string[];
   category: "high" | "medium" | "low";
   environment: string;
+  projectId: string;
+  projectName: string;
+  assignedTo?: string;
+  status: "open" | "in-progress" | "resolved" | "ignored";
+  priority: "critical" | "high" | "medium" | "low";
 }
 
 interface FlakyTestAnalysisProps {
@@ -55,6 +65,11 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
       lastFailure: "2023-06-15 14:32:45",
       category: "high",
       environment: "Chrome / Windows",
+      projectId: "1",
+      projectName: "E-commerce Platform",
+      assignedTo: "Alice Johnson",
+      status: "in-progress",
+      priority: "critical",
       suggestedFixes: [
         "Add explicit wait for email verification element",
         "Implement retry mechanism for network requests",
@@ -70,6 +85,11 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
       lastFailure: "2023-06-15 13:45:22",
       category: "high",
       environment: "Firefox / MacOS",
+      projectId: "1",
+      projectName: "E-commerce Platform",
+      assignedTo: "Bob Smith",
+      status: "open",
+      priority: "high",
       suggestedFixes: [
         "Increase timeout for search results loading",
         "Add wait condition for filter animation completion",
@@ -85,6 +105,11 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
       lastFailure: "2023-06-15 12:18:03",
       category: "medium",
       environment: "Safari / iOS",
+      projectId: "2",
+      projectName: "Mobile App Backend",
+      assignedTo: "Carol Davis",
+      status: "resolved",
+      priority: "medium",
       suggestedFixes: [
         "Add delay between item additions",
         "Verify cart update completion before next action",
@@ -100,6 +125,10 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
       lastFailure: "2023-06-15 11:05:17",
       category: "medium",
       environment: "Edge / Windows",
+      projectId: "2",
+      projectName: "Mobile App Backend",
+      status: "open",
+      priority: "medium",
       suggestedFixes: [
         "Implement file upload progress monitoring",
         "Add validation for supported file formats",
@@ -115,6 +144,10 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
       lastFailure: "2023-06-15 10:22:51",
       category: "low",
       environment: "Chrome / Android",
+      projectId: "3",
+      projectName: "Analytics Dashboard",
+      status: "ignored",
+      priority: "low",
       suggestedFixes: [
         "Add loading state verification",
         "Implement data freshness checks",
@@ -123,8 +156,11 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
     },
   ],
 }) => {
+  const { hasPermission, isAdmin } = useAuth();
   const [sortBy, setSortBy] = useState("instabilityScore");
   const [filterCategory, setFilterCategory] = useState("all");
+  const [filterProject, setFilterProject] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
 
   const getCategoryColor = (category: string) => {
     switch (category) {
@@ -145,9 +181,51 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
     return "text-green-600";
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "open":
+        return "bg-red-100 text-red-800";
+      case "in-progress":
+        return "bg-blue-100 text-blue-800";
+      case "resolved":
+        return "bg-green-100 text-green-800";
+      case "ignored":
+        return "bg-gray-100 text-gray-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "resolved":
+        return <CheckCircle className="h-3 w-3" />;
+      case "in-progress":
+        return <Clock className="h-3 w-3" />;
+      case "open":
+        return <AlertTriangle className="h-3 w-3" />;
+      case "ignored":
+        return <XCircle className="h-3 w-3" />;
+      default:
+        return <AlertTriangle className="h-3 w-3" />;
+    }
+  };
+
   const filteredTests = flakyTests.filter((test) => {
-    return filterCategory === "all" || test.category === filterCategory;
+    const matchesCategory =
+      filterCategory === "all" || test.category === filterCategory;
+    const matchesProject =
+      filterProject === "all" || test.projectId === filterProject;
+    const matchesStatus =
+      filterStatus === "all" || test.status === filterStatus;
+    return matchesCategory && matchesProject && matchesStatus;
   });
+
+  const uniqueProjects = [
+    ...new Set(
+      flakyTests.map((t) => ({ id: t.projectId, name: t.projectName })),
+    ),
+  ];
 
   const sortedTests = [...filteredTests].sort((a, b) => {
     switch (sortBy) {
@@ -180,6 +258,12 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
           </p>
         </div>
         <div className="flex gap-2 mt-4 md:mt-0">
+          {isAdmin() && (
+            <Button variant="outline" size="sm">
+              <Settings className="h-4 w-4 mr-2" />
+              Manage Tests
+            </Button>
+          )}
           <Button variant="outline" size="sm">
             <ExternalLink className="h-4 w-4 mr-2" />
             Export Report
@@ -254,6 +338,34 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <Select value={filterProject} onValueChange={setFilterProject}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by project" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Projects</SelectItem>
+            {uniqueProjects.map((project) => (
+              <SelectItem key={project.id} value={project.id}>
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-3 w-3" />
+                  {project.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="open">Open</SelectItem>
+            <SelectItem value="in-progress">In Progress</SelectItem>
+            <SelectItem value="resolved">Resolved</SelectItem>
+            <SelectItem value="ignored">Ignored</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Sort by" />
@@ -291,12 +403,13 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
               <TableHeader>
                 <TableRow>
                   <TableHead>Test Name</TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Risk Level</TableHead>
                   <TableHead>Instability Score</TableHead>
                   <TableHead>Failure Rate</TableHead>
-                  <TableHead>Total Runs</TableHead>
+                  <TableHead>Assigned To</TableHead>
                   <TableHead>Environment</TableHead>
-                  <TableHead>Last Failure</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -306,6 +419,21 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
                     <TableCell className="font-medium max-w-xs">
                       <div className="truncate" title={test.testName}>
                         {test.testName}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <FolderOpen className="h-3 w-3 text-gray-500" />
+                        <span className="text-sm">{test.projectName}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(test.status)}
+                        <Badge className={getStatusColor(test.status)}>
+                          {test.status.charAt(0).toUpperCase() +
+                            test.status.slice(1).replace("-", " ")}
+                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -330,18 +458,24 @@ const FlakyTestAnalysis: React.FC<FlakyTestAnalysisProps> = ({
                     <TableCell>
                       <span className="font-medium">{test.failureRate}%</span>
                     </TableCell>
-                    <TableCell>{test.totalRuns}</TableCell>
+                    <TableCell className="text-sm">
+                      {test.assignedTo || "Unassigned"}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{test.environment}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {test.lastFailure}
-                    </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm">
-                        <Lightbulb className="h-4 w-4 mr-1" />
-                        View Fixes
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm">
+                          <Lightbulb className="h-4 w-4 mr-1" />
+                          Fixes
+                        </Button>
+                        {hasPermission("canWrite") && (
+                          <Button variant="ghost" size="sm">
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
